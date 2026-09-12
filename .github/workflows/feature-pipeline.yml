@@ -42,10 +42,10 @@ jobs:
           key: tflint-${{ runner.os }}-${{ hashFiles('.tflint.hcl') }}
 
       - name: Initialize TFLint
-        run: tflint --init --config=.tflint.hcl
+        run: tflint --init --config="${GITHUB_WORKSPACE}/.tflint.hcl"
 
       - name: Run TFLint
-        run: tflint --recursive --config=.tflint.hcl
+        run: tflint --recursive --config="${GITHUB_WORKSPACE}/.tflint.hcl"
 
   # =======================================================
   # Stage 2: Security & Compliance Scanning (Checkov)
