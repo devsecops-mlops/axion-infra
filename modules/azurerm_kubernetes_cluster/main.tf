@@ -38,4 +38,10 @@ resource "azurerm_kubernetes_cluster" "aks" {
   }
 
   tags = each.value.tags
+
+  lifecycle {
+    ignore_changes = [
+      default_node_pool[0].upgrade_settings
+    ]
+  }
 }

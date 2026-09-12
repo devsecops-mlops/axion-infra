@@ -5,4 +5,8 @@ resource "azurerm_role_assignment" "ra" {
   role_definition_name             = each.value.role_definition_name
   scope                            = each.value.scope
   skip_service_principal_aad_check = each.value.skip_service_principal_aad_check
+
+  lifecycle {
+    ignore_changes = [skip_service_principal_aad_check]
+  }
 }
