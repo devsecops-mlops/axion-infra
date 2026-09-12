@@ -43,7 +43,7 @@ aks_clusters = {
     resource_group_name = "rg-microservices-dev"
     location            = "eastus"
     dns_prefix          = "aks-microservices-dev"
-    kubernetes_version  = "1.30"
+    kubernetes_version  = "1.35"
     sku_tier            = "Free"
 
     # System-Assigned Managed Identity
