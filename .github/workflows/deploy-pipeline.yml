@@ -4,11 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - "environments/**"
-      - "modules/**"
-      - ".github/workflows/**"
-      - "*.tf"
 
 permissions:
   id-token: write
