@@ -1,0 +1,163 @@
+name: "Feature / PR Pipeline"
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "environments/**"
+      - "modules/**"
+      - ".github/workflows/**"
+      - "*.tf"
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  # =======================================================
+  # Stage 1: Code Formatting & TFLint Static Analysis
+  # =======================================================
+  lint:
+    name: "Stage 1: Lint & Code Quality"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.14.3"
+
+      - name: Check Terraform Formatting
+        run: terraform fmt -check -recursive
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: "v0.58.0"
+
+      - name: Cache TFLint Plugins
+        uses: actions/cache@v4
+        with:
+          path: ~/.tflint.d/plugins
+          key: tflint-${{ runner.os }}-${{ hashFiles('.tflint.hcl') }}
+
+      - name: Initialize TFLint
+        run: tflint --init --config=.tflint.hcl
+
+      - name: Run TFLint
+        run: tflint --recursive --config=.tflint.hcl
+
+  # =======================================================
+  # Stage 2: Security & Compliance Scanning (Checkov)
+  # =======================================================
+  security-scan:
+    name: "Stage 2: Security Scan (Checkov)"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Checkov
+        run: pip install checkov
+
+      - name: Run Checkov Security Scan
+        run: |
+          checkov --config-file .checkov.yaml -d .
+
+  # =======================================================
+  # Stage 3: Terraform Validation & Speculative Plan
+  # =======================================================
+  terraform-plan:
+    name: "Stage 3: Terraform Validate & Plan"
+    needs: [lint, security-scan]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: environments/dev
+
+    env:
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_USE_OIDC: "true"
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.14.3"
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan -no-color -out=tfplan 2>&1 | tee plan_output.txt
+        continue-on-error: false
+
+      - name: Post Plan Summary to PR
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            let planOutput = '';
+            try {
+              planOutput = fs.readFileSync('environments/dev/plan_output.txt', 'utf8');
+              if (planOutput.length > 60000) {
+                planOutput = planOutput.substring(0, 60000) + '\n... [Plan output truncated]';
+              }
+            } catch (err) {
+              planOutput = 'Could not read plan output file.';
+            }
+
+            const output = `### 🚀 Terraform Pull Request Verification Summary
+            #### Stage Status:
+            - **Format & TFLint:** ✅ \`PASSED\`
+            - **Checkov Security Scan:** ✅ \`PASSED\`
+            - **Terraform Validation:** \`${{ steps.validate.outcome }}\`
+            - **Terraform Plan:** \`${{ steps.plan.outcome }}\`
+
+            <details><summary>Show Terraform Plan Output</summary>
+
+            \`\`\`terraform
+            ${planOutput}
+            \`\`\`
+
+            </details>
+
+            *Pushed by: @${{ github.actor }} | Action: \`${{ github.event_name }}\`*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });

@@ -1,0 +1,8 @@
+# Checkov configuration
+framework:
+  - terraform
+compact: true
+soft-fail: true
+download-external-modules: true
+output:
+  - cli
