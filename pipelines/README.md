@@ -56,19 +56,17 @@ Add the following secrets under **Repository Settings > Secrets and variables > 
 
 ---
 
-## 4. Azure OIDC Federated Credential Setup
+## 4. Azure OIDC Federated Credentials (Configured)
 
-To allow GitHub Actions to authenticate without static client secrets:
+The Azure AD Application `github-actions-axion-infra` (`50caaf87-f88b-4b47-8e71-738b4baee9da`) has been configured with 3 federated identity credentials:
+- **Pull Requests**: `repo:devsecops-mlops/axion-infra:pull_request` (`github-actions-pr`)
+- **Main Branch**: `repo:devsecops-mlops/axion-infra:ref:refs/heads/main` (`github-actions-main`)
+- **Dev Environment**: `repo:devsecops-mlops/axion-infra:environment:dev` (`github-actions-env-dev`)
 
-1. In the **Azure Portal**, go to **Microsoft Entra ID > App registrations > Your App**.
-2. Navigate to **Certificates & secrets > Federated credentials > Add credential**.
-3. Select **GitHub Actions deploying Azure resources**.
-4. Configure two federated credentials:
-   - **For Pull Requests**:
-     - Entity type: `Pull request`
-   - **For Main Branch**:
-     - Entity type: `Branch`
-     - Branch name: `main`
+Assigned Roles:
+- `Contributor` on subscription `1f196f8e-ab8f-4746-a1f5-1798c2228e8f`
+- `User Access Administrator` on subscription `1f196f8e-ab8f-4746-a1f5-1798c2228e8f`
+- `Storage Blob Data Contributor` on `rg-backend/aibasedtodo`
 
 ---
 
